@@ -177,7 +177,7 @@ view model =
     , Footer.view
     ]
 
--- VIEW CONTROLS AND FOOTER
+-- VIEW CONTROLS 
 
 viewControls : String -> List Entry.Model -> Html Msg
 viewControls visibility entries =
