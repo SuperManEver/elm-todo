@@ -123,7 +123,6 @@ type Msg
 
 
 
--- How we update our Model on a given Msg?
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
   let 
@@ -131,81 +130,74 @@ update msg model =
       if String.isEmpty str 
       then model.entries
       else model.entries ++ [ newEntry str model.uid ]
+
+    updateEntry id diff = 
+      List.map (\ e -> if e.id == id then diff e else e)
   in
-  case msg of
-    NoOp ->
-      model ! []
+    case msg of
+      NoOp ->
+        model ! []
 
-    AddEntry str ->
-      let 
-        (field', cmd) = Input.update Input.Clear model.field
-      in
-        { model | uid = model.uid + 1, entries = isEmpty str, field = field' } 
+      AddEntry str ->
+        let 
+          (field', cmd) = Input.update Input.Clear model.field
+        in
+          { model | uid = model.uid + 1, entries = isEmpty str, field = field' } 
+          ! 
+          [ Cmd.map inputTranslator cmd ]
+
+   
+      EditingEntry id isEditing ->
+        let
+          update = updateEntry id (\ e -> {e | editing = isEditing })
+          focus = Dom.focus ("todo-" ++ toString id)
+        in
+          { model | entries = update model.entries } 
+          ! 
+          [ Task.perform (\_ -> NoOp) (\_ -> NoOp) focus ]
+
+      UpdateEntry id task ->
+        let
+          update = updateEntry id (\ e -> {e | description = task})
+        in
+          { model | entries = update model.entries } ! []
+
+      Delete id ->
+        { model | entries = List.filter (\t -> t.id /= id) model.entries }
         ! 
-        [ Cmd.map inputTranslator cmd ]
+        []
 
- 
-    EditingEntry id isEditing ->
-      let
-        updateEntry t =
-          if t.id == id 
-          then { t | editing = isEditing }
-          else t
-
-        focus = Dom.focus ("todo-" ++ toString id)
-      in
-        { model | entries = List.map updateEntry model.entries } 
+      DeleteComplete ->
+        { model | entries = List.filter (not << .completed) model.entries }
         ! 
-        [ Task.perform (\_ -> NoOp) (\_ -> NoOp) focus ]
+        []
 
-    UpdateEntry id task ->
-      let
-        updateEntry t =
-          if t.id == id 
-          then { t | description = task }
-          else t 
-      in
-        { model | entries = List.map updateEntry model.entries } ! []
+      Check id isCompleted ->
+        let
+          update = updateEntry id (\ e -> {e | completed = isCompleted})     
+        in
+          { model | entries = update model.entries }
+          ! 
+          []  
 
-    Delete id ->
-      { model | entries = List.filter (\t -> t.id /= id) model.entries }
-      ! 
-      []
+      CheckAll isCompleted ->
+        let
+          updateEntry t = { t | completed = isCompleted }
+        in
+          { model | entries = List.map updateEntry model.entries }
+          ! 
+          []  
 
-    DeleteComplete ->
-      { model | entries = List.filter (not << .completed) model.entries }
-      ! 
-      []
-
-    Check id isCompleted ->
-      let
-        updateEntry t =
-          if t.id == id 
-          then { t | completed = isCompleted }
-          else t                
-      in
-        { model | entries = List.map updateEntry model.entries }
+      ChangeVisibility visibility ->
+        { model | visibility = visibility }
         ! 
-        []  
+        []
 
-    CheckAll isCompleted ->
-      let
-        updateEntry t = { t | completed = isCompleted }
-      in
-        { model | entries = List.map updateEntry model.entries }
-        ! 
-        []  
-
-    ChangeVisibility visibility ->
-      { model | visibility = visibility }
-      ! 
-      []
-
-    InputMsg subMsg -> 
-      let 
-        (field', cmd) = Input.update subMsg model.field
-      in
-        { model | field = field' } ! [ Cmd.map inputTranslator cmd ]
+      InputMsg subMsg -> 
+        let 
+          (field', cmd) = Input.update subMsg model.field
+        in
+          { model | field = field' } ! [ Cmd.map inputTranslator cmd ]
 
 
 
