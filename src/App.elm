@@ -25,6 +25,7 @@ import Task exposing (perform)
 
 -- modules 
 import Footer
+import Input
 
 -- main : Program (Maybe Model) Model Msg
 main =
@@ -56,7 +57,7 @@ updateWithStorage msg model =
 -- The full application state of our todo app.
 type alias Model =
   { entries : List Entry
-  , field : String
+  , field : Input.Model
   , uid : Int
   , visibility : String
   }
@@ -74,7 +75,7 @@ emptyModel : Model
 emptyModel =
   { entries = []
   , visibility = "All"
-  , field = ""
+  , field = Input.initModel
   , uid = 0
   }
 
@@ -92,6 +93,13 @@ init : Maybe Model -> ( Model, Cmd Msg )
 init savedModel =
   Maybe.withDefault emptyModel savedModel ! []
 
+-- TRANSLATORS
+inputTranslator : Input.Translator Msg 
+inputTranslator = 
+  Input.translator 
+    { onInternalMsg = InputMsg 
+    , onAddEntry = AddEntry
+    }
 
 
 -- UPDATE
@@ -103,10 +111,10 @@ to them.
 -}
 type Msg
   = NoOp
-  | UpdateField String
+  | InputMsg Input.InternalMsg
   | EditingEntry Int Bool
   | UpdateEntry Int String
-  | Add
+  | AddEntry String
   | Delete Int
   | DeleteComplete
   | Check Int Bool
@@ -128,11 +136,12 @@ update msg model =
     NoOp ->
       model ! []
 
-    Add ->
-      { model | uid = model.uid + 1, field = "", entries = isEmpty model.field } ! []
+    AddEntry str ->
+      let 
+        (field', cmd) = Input.update Input.Clear model.field
+      in
+        { model | uid = model.uid + 1, entries = isEmpty str, field = field' } ! [ Cmd.map inputTranslator cmd ]
 
-    UpdateField str ->
-      { model | field = str } ! []
  
     EditingEntry id isEditing ->
       let
@@ -186,9 +195,15 @@ update msg model =
         []  
 
     ChangeVisibility visibility ->
-        { model | visibility = visibility }
-        ! 
-        []
+      { model | visibility = visibility }
+      ! 
+      []
+
+    InputMsg subMsg -> 
+      let 
+        (field', cmd) = Input.update subMsg model.field
+      in
+        { model | field = field' } ! [ Cmd.map inputTranslator cmd ]
 
 
 
@@ -203,42 +218,12 @@ view model =
     ]
     [ section
       [ class "todoapp" ]
-      [ lazy viewInput model.field
+      [ App.map inputTranslator (lazy Input.view model.field)  -- add childTranslator
       , lazy2 viewEntries model.visibility model.entries
       , lazy2 viewControls model.visibility model.entries
       ]
     , Footer.view
     ]
-
-
-viewInput : String -> Html Msg
-viewInput task =
-  header
-    [ class "header" ]
-    [ h1 [] [ text "todos" ]
-    , input
-      [ class "new-todo"
-      , placeholder "What needs to be done?"
-      , autofocus True
-      , value task
-      , name "newTodo"
-      , onInput UpdateField
-      , onEnter Add
-      ]
-      []
-    ]
-
-
-onEnter : Msg -> Attribute Msg
-onEnter msg =
-  let
-    isEnter code =
-      if code == 13 then
-        Json.succeed msg
-      else
-        Json.fail "not ENTER"
-  in
-    on "keydown" (Json.andThen keyCode isEnter)
 
 
 -- VIEW ALL ENTRIES
@@ -248,24 +233,24 @@ viewEntries : String -> List Entry -> Html Msg
 viewEntries visibility entries =
   let
     isVisible todo =
-        case visibility of
-            "Completed" ->
-                todo.completed
+      case visibility of
+        "Completed" ->
+            todo.completed
 
-            "Active" ->
-                not todo.completed
+        "Active" ->
+            not todo.completed
 
-            _ ->
-                True
+        _ ->
+            True
 
     allCompleted =
-        List.all .completed entries
+      List.all .completed entries
 
     cssVisibility =
-        if List.isEmpty entries then
-            "hidden"
-        else
-            "visible"
+      if List.isEmpty entries 
+      then "hidden"
+      else "visible"
+          
   in
     section
         [ class "main"
@@ -330,7 +315,15 @@ viewEntry todo =
       []
     ]
 
-
+onEnter : Msg -> Attribute Msg
+onEnter msg =
+  let
+    isEnter code =
+      if code == 13 
+      then Json.succeed msg
+      else Json.fail "not ENTER"
+  in
+    on "keydown" (Json.andThen keyCode isEnter)
 
 -- VIEW CONTROLS AND FOOTER
 
