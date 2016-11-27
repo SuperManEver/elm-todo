@@ -140,7 +140,9 @@ update msg model =
       let 
         (field', cmd) = Input.update Input.Clear model.field
       in
-        { model | uid = model.uid + 1, entries = isEmpty str, field = field' } ! [ Cmd.map inputTranslator cmd ]
+        { model | uid = model.uid + 1, entries = isEmpty str, field = field' } 
+        ! 
+        [ Cmd.map inputTranslator cmd ]
 
  
     EditingEntry id isEditing ->
