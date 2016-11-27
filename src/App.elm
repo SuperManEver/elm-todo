@@ -23,6 +23,8 @@ import Json.Decode as Json
 import String
 import Task exposing (perform)
 
+-- modules 
+import Footer
 
 -- main : Program (Maybe Model) Model Msg
 main =
@@ -213,7 +215,7 @@ view model =
             , lazy2 viewEntries model.visibility model.entries
             , lazy2 viewControls model.visibility model.entries
             ]
-        , infoFooter
+        , Footer.view
         ]
 
 
@@ -407,17 +409,3 @@ viewControlsClear entriesCompleted =
         [ text ("Clear completed (" ++ toString entriesCompleted ++ ")")
         ]
 
-
-infoFooter : Html msg
-infoFooter =
-    footer [ class "info" ]
-        [ p [] [ text "Double-click to edit a todo" ]
-        , p []
-            [ text "Written by "
-            , a [ href "https://github.com/evancz" ] [ text "Evan Czaplicki" ]
-            ]
-        , p []
-            [ text "Part of "
-            , a [ href "http://todomvc.com" ] [ text "TodoMVC" ]
-            ]
-        ]
