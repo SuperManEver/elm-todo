@@ -117,22 +117,22 @@ view visibility entries =
           
   in
     section
-        [ class "main"
-        , style [ ( "visibility", cssVisibility ) ]
-        ]
-        [ input
-            [ class "toggle-all"
-            , type' "checkbox"
-            , name "toggle"
-            , checked allCompleted
-            , onClick (CheckAll (not allCompleted) |> ForParent)
-            ]
-            []
-        , label
-            [ for "toggle-all" ]
-            [ text "Mark all as complete" ]
-        , entries'
-        ]
+      [ class "main"
+      , style [ ( "visibility", cssVisibility ) ]
+      ]
+      [ input
+          [ class "toggle-all"
+          , type' "checkbox"
+          , name "toggle"
+          , checked allCompleted
+          , onClick (CheckAll (not allCompleted) |> ForParent)
+          ]
+          []
+      , label
+          [ for "toggle-all" ]
+          [ text "Mark all as complete" ]
+      , entries'
+      ]
 
 
 viewKeyedEntry : Model -> ( String, Html Msg )
@@ -154,11 +154,11 @@ viewEntry todo =
           ]
           []
       , label
-          [ onDoubleClick (ForSelf todo.id (Edit True)) ]
+          [ onDoubleClick (Edit True |> ForSelf todo.id) ]
           [ text todo.description ]
       , button
           [ class "destroy"
-          , onClick (ForParent (DeleteEntry todo.id))
+          , onClick (DeleteEntry todo.id |> ForParent)
           ]
           []
       ]
