@@ -261,8 +261,10 @@ viewEntries visibility entries =
         , label
             [ for "toggle-all" ]
             [ text "Mark all as complete" ]
-        , Keyed.ul [ class "todo-list" ] <|
-            List.map viewKeyedEntry (List.filter isVisible entries)
+        , entries 
+            |> List.filter isVisible
+            |> List.map viewKeyedEntry
+            |> Keyed.ul [ class "todo-list" ]
         ]
 
 
