@@ -26,6 +26,7 @@ import Task exposing (perform)
 -- modules 
 import Footer
 import Input
+import Entry
 
 -- main : Program (Maybe Model) Model Msg
 main =
@@ -56,19 +57,12 @@ updateWithStorage msg model =
 
 -- The full application state of our todo app.
 type alias Model =
-  { entries : List Entry
+  { entries : List Entry.Model
   , field : Input.Model
   , uid : Int
   , visibility : String
   }
 
-
-type alias Entry =
-  { description : String
-  , completed : Bool
-  , editing : Bool
-  , id : Int
-  }
 
 
 emptyModel : Model
@@ -79,16 +73,6 @@ emptyModel =
   , uid = 0
   }
 
-
-newEntry : String -> Int -> Entry
-newEntry desc id =
-  { description = desc
-  , completed = False
-  , editing = False
-  , id = id
-  }
-
-
 init : Maybe Model -> ( Model, Cmd Msg )
 init savedModel =
   Maybe.withDefault emptyModel savedModel ! []
@@ -98,7 +82,14 @@ inputTranslator : Input.Translator Msg
 inputTranslator = 
   Input.translator 
     { onInternalMsg = InputMsg 
-    , onAddEntry = AddEntry
+    , onAddEntry    = AddEntry
+    }
+
+entryTranslator : Entry.Translator Msg 
+entryTranslator = 
+  Entry.translator 
+    { onInternalMsg = EntryMsg
+    , onDeleteEntry = Delete
     }
 
 
@@ -112,15 +103,12 @@ to them.
 type Msg
   = NoOp
   | InputMsg Input.InternalMsg
-  | EditingEntry Int Bool
-  | UpdateEntry Int String
+  | EntryMsg Int Entry.InternalMsg
   | AddEntry String
   | Delete Int
   | DeleteComplete
-  | Check Int Bool
   | CheckAll Bool
   | ChangeVisibility String
-
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -129,7 +117,7 @@ update msg model =
     isEmpty str = 
       if String.isEmpty str 
       then model.entries
-      else model.entries ++ [ newEntry str model.uid ]
+      else model.entries ++ [ Entry.newEntry str model.uid ]
 
     updateEntry id diff = 
       List.map (\ e -> if e.id == id then diff e else e)
@@ -145,53 +133,24 @@ update msg model =
           { model | uid = model.uid + 1, entries = isEmpty str, field = field' } 
           ! 
           [ Cmd.map inputTranslator cmd ]
-
-   
-      EditingEntry id isEditing ->
-        let
-          update = updateEntry id (\ e -> {e | editing = isEditing })
-          focus = Dom.focus ("todo-" ++ toString id)
-        in
-          { model | entries = update model.entries } 
-          ! 
-          [ Task.perform (\_ -> NoOp) (\_ -> NoOp) focus ]
-
-      UpdateEntry id task ->
-        let
-          update = updateEntry id (\ e -> {e | description = task})
-        in
-          { model | entries = update model.entries } ! []
-
+        
       Delete id ->
-        { model | entries = List.filter (\t -> t.id /= id) model.entries }
-        ! 
-        []
+        { model | entries = List.filter (\t -> t.id /= id) model.entries } ! []
+
 
       DeleteComplete ->
-        { model | entries = List.filter (not << .completed) model.entries }
-        ! 
-        []
-
-      Check id isCompleted ->
-        let
-          update = updateEntry id (\ e -> {e | completed = isCompleted})     
-        in
-          { model | entries = update model.entries }
-          ! 
-          []  
+        { model | entries = List.filter (not << .completed) model.entries } ! []
+  
 
       CheckAll isCompleted ->
         let
           updateEntry t = { t | completed = isCompleted }
         in
-          { model | entries = List.map updateEntry model.entries }
-          ! 
-          []  
+          { model | entries = List.map updateEntry model.entries } ! []
+       
 
       ChangeVisibility visibility ->
-        { model | visibility = visibility }
-        ! 
-        []
+        { model | visibility = visibility } ! []
 
       InputMsg subMsg -> 
         let 
@@ -200,6 +159,23 @@ update msg model =
           { model | field = field' } ! [ Cmd.map inputTranslator cmd ]
 
 
+      EntryMsg id subMsg -> 
+        let 
+          entry = 
+            model.entries 
+              |> List.filter (\ e -> e.id == id) 
+              |> List.head 
+        in          
+          case entry of 
+            Just val -> 
+              let 
+                (entry', cmd) = Entry.update subMsg val
+                update = updateEntry id (\ _ -> entry') 
+              in
+                { model | entries = update model.entries } ! [ Cmd.map entryTranslator cmd ]
+
+            Nothing -> 
+              model ! []
 
 -- VIEW
 
@@ -223,7 +199,7 @@ view model =
 -- VIEW ALL ENTRIES
 
 
-viewEntries : String -> List Entry -> Html Msg
+viewEntries : String -> List Entry.Model -> Html Msg
 viewEntries visibility entries =
   let
     isVisible todo =
@@ -263,68 +239,15 @@ viewEntries visibility entries =
             [ text "Mark all as complete" ]
         , entries 
             |> List.filter isVisible
-            |> List.map viewKeyedEntry
+            |> List.map Entry.view
             |> Keyed.ul [ class "todo-list" ]
+            |> App.map entryTranslator
         ]
 
 
-
--- VIEW INDIVIDUAL ENTRIES
-
-
-viewKeyedEntry : Entry -> ( String, Html Msg )
-viewKeyedEntry todo =
-  ( toString todo.id, lazy viewEntry todo )
-
-
-viewEntry : Entry -> Html Msg
-viewEntry todo =
-  li
-    [ classList [ ( "completed", todo.completed ), ( "editing", todo.editing ) ] ]
-    [ div
-      [ class "view" ]
-      [ input
-          [ class "toggle"
-          , type' "checkbox"
-          , checked todo.completed
-          , onClick (Check todo.id (not todo.completed))
-          ]
-          []
-      , label
-          [ onDoubleClick (EditingEntry todo.id True) ]
-          [ text todo.description ]
-      , button
-          [ class "destroy"
-          , onClick (Delete todo.id)
-          ]
-          []
-      ]
-    , input
-      [ class "edit"
-      , value todo.description
-      , name "title"
-      , id ("todo-" ++ toString todo.id)
-      , onInput (UpdateEntry todo.id)
-      , onBlur (EditingEntry todo.id False)
-      , onEnter (EditingEntry todo.id False)
-      ]
-      []
-    ]
-
-onEnter : Msg -> Attribute Msg
-onEnter msg =
-  let
-    isEnter code =
-      if code == 13 
-      then Json.succeed msg
-      else Json.fail "not ENTER"
-  in
-    on "keydown" (Json.andThen keyCode isEnter)
-
 -- VIEW CONTROLS AND FOOTER
 
-
-viewControls : String -> List Entry -> Html Msg
+viewControls : String -> List Entry.Model -> Html Msg
 viewControls visibility entries =
   let
     entriesCompleted =
