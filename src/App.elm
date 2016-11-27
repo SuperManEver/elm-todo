@@ -17,7 +17,6 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.App as App
 import Html.Events exposing (..)
-import Html.Keyed as Keyed
 import Html.Lazy exposing (lazy, lazy2)
 import Json.Decode as Json
 import String
@@ -28,7 +27,6 @@ import Footer
 import Input
 import Entry
 
--- main : Program (Maybe Model) Model Msg
 main =
   App.programWithFlags
     { init = init
@@ -54,8 +52,6 @@ updateWithStorage msg model =
 
 -- MODEL
 
-
--- The full application state of our todo app.
 type alias Model =
   { entries : List Entry.Model
   , field : Input.Model
@@ -78,6 +74,7 @@ init savedModel =
   Maybe.withDefault emptyModel savedModel ! []
 
 -- TRANSLATORS
+
 inputTranslator : Input.Translator Msg 
 inputTranslator = 
   Input.translator 
@@ -90,16 +87,12 @@ entryTranslator =
   Entry.translator 
     { onInternalMsg = EntryMsg
     , onDeleteEntry = Delete
+    , onCheckAll = CheckAll
     }
 
 
 -- UPDATE
 
-
-{-| Users of our app can trigger messages by clicking and typing. These
-messages are fed into the `update` function as they occur, letting us react
-to them.
--}
 type Msg
   = NoOp
   | InputMsg Input.InternalMsg
@@ -189,65 +182,12 @@ view model =
     ]
     [ section
       [ class "todoapp" ]
-      [ App.map inputTranslator (lazy Input.view model.field)  -- add childTranslator
-      , lazy2 viewEntries model.visibility model.entries
+      [ lazy Input.view model.field |> App.map inputTranslator
+      , lazy2 Entry.view model.visibility model.entries |> App.map entryTranslator
       , lazy2 viewControls model.visibility model.entries
       ]
     , Footer.view
     ]
-
-
--- VIEW ALL ENTRIES
-
-
-viewEntries : String -> List Entry.Model -> Html Msg
-viewEntries visibility entries =
-  let
-    isVisible todo =
-      case visibility of
-        "Completed" ->
-            todo.completed
-
-        "Active" ->
-            not todo.completed
-
-        _ ->
-            True
-
-    allCompleted =
-      List.all .completed entries
-
-    cssVisibility =
-      if List.isEmpty entries 
-      then "hidden"
-      else "visible"
-
-    entries' =
-      entries 
-        |> List.filter isVisible
-        |> List.map Entry.view
-        |> Keyed.ul [ class "todo-list" ]
-        |> App.map entryTranslator
-          
-  in
-    section
-        [ class "main"
-        , style [ ( "visibility", cssVisibility ) ]
-        ]
-        [ input
-            [ class "toggle-all"
-            , type' "checkbox"
-            , name "toggle"
-            , checked allCompleted
-            , onClick (CheckAll (not allCompleted))
-            ]
-            []
-        , label
-            [ for "toggle-all" ]
-            [ text "Mark all as complete" ]
-        , entries'
-        ]
-
 
 -- VIEW CONTROLS AND FOOTER
 

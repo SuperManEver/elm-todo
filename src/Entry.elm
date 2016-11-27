@@ -4,6 +4,7 @@ import Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
+import Html.Keyed as Keyed
 import Json.Decode as Json
 import Html.Events exposing (onInput, keyCode, on, onDoubleClick, onBlur)
 import Html.Lazy exposing (lazy)
@@ -33,16 +34,20 @@ type alias Translator parentMsg =
 type alias TranslationDictionary parentMsg = 
   { onInternalMsg : Int -> InternalMsg -> parentMsg 
   , onDeleteEntry : Int -> parentMsg 
+  , onCheckAll : Bool -> parentMsg
   }
 
 translator : TranslationDictionary parentMsg -> Translator parentMsg 
-translator { onInternalMsg, onDeleteEntry } msg = 
+translator { onInternalMsg, onDeleteEntry, onCheckAll } msg = 
   case msg of 
     ForSelf id internal ->
       onInternalMsg id internal 
 
     ForParent (DeleteEntry id) -> 
       onDeleteEntry id
+
+    ForParent (CheckAll bool) -> 
+      onCheckAll bool
 
 
 -- UPDATE 
@@ -54,6 +59,7 @@ type InternalMsg
 
 type OutMsg 
   = DeleteEntry Int 
+  | CheckAll Bool
 
 type Msg 
   = ForSelf Int InternalMsg 
@@ -81,8 +87,56 @@ update msg model =
 
 
 -- VIEW 
-view : Model -> ( String, Html Msg )
-view todo =
+view : String -> List Model -> Html Msg
+view visibility entries =
+  let
+    isVisible todo =
+      case visibility of
+        "Completed" ->
+            todo.completed
+
+        "Active" ->
+            not todo.completed
+
+        _ ->
+            True
+
+    allCompleted =
+      List.all .completed entries
+
+    cssVisibility =
+      if List.isEmpty entries 
+      then "hidden"
+      else "visible"
+
+    entries' =
+      entries 
+        |> List.filter isVisible
+        |> List.map viewKeyedEntry
+        |> Keyed.ul [ class "todo-list" ]
+          
+  in
+    section
+        [ class "main"
+        , style [ ( "visibility", cssVisibility ) ]
+        ]
+        [ input
+            [ class "toggle-all"
+            , type' "checkbox"
+            , name "toggle"
+            , checked allCompleted
+            , onClick (CheckAll (not allCompleted) |> ForParent)
+            ]
+            []
+        , label
+            [ for "toggle-all" ]
+            [ text "Mark all as complete" ]
+        , entries'
+        ]
+
+
+viewKeyedEntry : Model -> ( String, Html Msg )
+viewKeyedEntry todo =
   ( toString todo.id, lazy viewEntry todo )
 
 
