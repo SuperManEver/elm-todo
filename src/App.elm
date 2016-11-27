@@ -152,6 +152,7 @@ update msg model =
       ChangeVisibility visibility ->
         { model | visibility = visibility } ! []
 
+
       InputMsg subMsg -> 
         let 
           (field', cmd) = Input.update subMsg model.field
@@ -177,8 +178,8 @@ update msg model =
             Nothing -> 
               model ! []
 
--- VIEW
 
+-- VIEW
 
 view : Model -> Html Msg
 view model =
@@ -220,6 +221,13 @@ viewEntries visibility entries =
       if List.isEmpty entries 
       then "hidden"
       else "visible"
+
+    entries' =
+      entries 
+        |> List.filter isVisible
+        |> List.map Entry.view
+        |> Keyed.ul [ class "todo-list" ]
+        |> App.map entryTranslator
           
   in
     section
@@ -237,11 +245,7 @@ viewEntries visibility entries =
         , label
             [ for "toggle-all" ]
             [ text "Mark all as complete" ]
-        , entries 
-            |> List.filter isVisible
-            |> List.map Entry.view
-            |> Keyed.ul [ class "todo-list" ]
-            |> App.map entryTranslator
+        , entries'
         ]
 
 
